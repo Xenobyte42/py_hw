@@ -23,16 +23,19 @@ def clean_line(line, params):
     from the string, and lowercase if required
     """
 
-    cleaned_line = line.rstrip().rstrip('\n')
+    line = line.rstrip('\n')
+    cleaned_line = line
     if params.ignore_case:
         cleaned_line = cleaned_line.lower()
     return cleaned_line
 
-def append_match(match, matches):
+def append_match(index, delimiter, match, matches):
     """Adds a string if it is not in the list"""
 
     if match not in matches:
-        matches.append(match)
+        matches[match] = [index, delimiter]
+    elif matches[match][1] is '-' and delimiter is ':':
+        matches[match][1] = delimiter
 
 def add_lines(matches, index, lines, params):
     """Adds the appropriate strings to the array,
@@ -58,8 +61,10 @@ def add_lines(matches, index, lines, params):
             start_idx = 0
 
     for i in range(start_idx, last_idx + 1):
-        lines[i] = lines[i].rstrip('\n')
-        append_match([i + 1, lines[i]], matches)
+        if i is not index:
+            append_match(i + 1, '-', lines[i], matches)
+        else:
+            append_match(i + 1, ':', lines[i], matches)
 
 def find_pattern(pattern, line):
     """Recursively (just for *) looks for a pattern in the input string"""
@@ -89,12 +94,11 @@ def find_pattern(pattern, line):
 def parse_lines(lines, params):
     """Creates a list of required strings that match the pattern and parameters"""
 
-    matches = []
+    matches = {}
     if params.ignore_case:
         params.pattern = params.pattern.lower()
 
     for index, line in enumerate(lines):
-        line = line.rstrip('\n')
         cleaned_line = clean_line(line, params)
 
         if params.invert ^ find_pattern(params.pattern, cleaned_line):
@@ -111,21 +115,17 @@ def output_matches(matches, params):
     """The correct output information, in accordance with the parameters"""
 
     if not params.count:
-        if params.context or params.after_context or params.before_context:
-            last_idx = -2   # Just for first '--' in block output
-            for match in matches:
-                if match[0] - last_idx > 1:
-                    print("--")
-                last_idx = match[0]
+        for key in matches:
+            if params.context or params.after_context or params.before_context:
                 if params.line_number:
-                    print(match[0], '-', sep="", end="")
-                output(match[1])
-            print("--")
-        else:
-            for match in matches:
+                    output(str(matches[key][0]) + matches[key][1] + key)
+                else:
+                    output(key)
+            else:
                 if params.line_number:
-                    print(match[0], ':', sep="", end="")
-                output(match[1])
+                    output(str(matches[key][0]) + matches[key][1] + key)
+                else:
+                    output(key)
     else:
         output(str(len(matches)))
 

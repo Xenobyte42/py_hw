@@ -1,7 +1,5 @@
-
 from unittest import TestCase
 
-# from grep import grep, parse_args
 import grep
 
 lst = []
@@ -12,7 +10,6 @@ def save_to_list(line):
 
 
 grep.output = save_to_list
-
 
 class GrepBaseTest(TestCase):
 
@@ -46,7 +43,6 @@ class GrepBaseTest(TestCase):
         params = grep.parse_args(['-i', 'a'])
         grep.grep(self.lines, params)
         self.assertEqual(lst, ['baab', 'A'])
-
 
 class GrepPatternTest(TestCase):
 
@@ -123,3 +119,26 @@ class GrepContextTest(TestCase):
         params = grep.parse_args(['-A1','bbb'])
         grep.grep(self.lines, params)
         self.assertEqual(lst, ['abbb', 'fc', 'bbb', 'cc'])
+
+class GrepLineNumbersTest(TestCase):
+
+    lines = ['vr','baab', 'abbb', 'fc', 'bbb', 'cc']
+
+    def tearDown(self):
+        global lst
+        lst.clear()
+
+    def test_numbers_base(self):
+        params = grep.parse_args(['-n','ab'])
+        grep.grep(self.lines, params)
+        self.assertEqual(lst, ['2:baab', '3:abbb'])
+
+    def test_numbers_context(self):
+        params = grep.parse_args(['-n', '-C1','aa'])
+        grep.grep(self.lines, params)
+        self.assertEqual(lst, ['1-vr', '2:baab', '3-abbb'])
+
+    def test_numbers_context_question(self):
+        params = grep.parse_args(['-n', '-C1', '???'])
+        grep.grep(self.lines, params)
+        self.assertEqual(lst, ['1-vr', '2:baab', '3:abbb', '4-fc', '5:bbb', '6-cc'])

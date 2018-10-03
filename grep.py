@@ -18,53 +18,20 @@ import argparse
 import sys
 
 
+def output(line):
+    """Unittest output function"""
+
+    print(line)
+
 def clean_line(line, params):
     """The function removes minor spaces and \n
     from the string, and lowercase if required
     """
 
-    line = line.rstrip('\n')
     cleaned_line = line
     if params.ignore_case:
         cleaned_line = cleaned_line.lower()
     return cleaned_line
-
-def append_match(index, delimiter, match, matches):
-    """Adds a string if it is not in the list"""
-
-    if match not in matches:
-        matches[match] = [index, delimiter]
-    elif matches[match][1] is '-' and delimiter is ':':
-        matches[match][1] = delimiter
-
-def add_lines(matches, index, lines, params):
-    """Adds the appropriate strings to the array,
-    as well as the strings around them, if necessary
-    """
-
-    start_idx = index
-    last_idx = index
-    if params.context > 0:
-        start_idx = index - params.context
-        if start_idx < 0:
-            start_idx = 0
-        last_idx = index + params.context
-        if last_idx >= len(lines):
-            last_idx = len(lines) - 1
-    elif params.after_context > 0:
-        last_idx = index + params.after_context
-        if last_idx >= len(lines):
-            last_idx = len(lines) - 1
-    elif params.before_context > 0:
-        start_idx = index - params.before_context
-        if start_idx < 0:
-            start_idx = 0
-
-    for i in range(start_idx, last_idx + 1):
-        if i is not index:
-            append_match(i + 1, '-', lines[i], matches)
-        else:
-            append_match(i + 1, ':', lines[i], matches)
 
 def find_pattern(pattern, line):
     """Recursively (just for *) looks for a pattern in the input string"""
@@ -91,49 +58,75 @@ def find_pattern(pattern, line):
                 return True
     return False
 
-def parse_lines(lines, params):
-    """Creates a list of required strings that match the pattern and parameters"""
+def output_line(index, params, lines, delimiter):
+    """The correct output information, in accordance with the parameters"""
 
-    matches = {}
+    if params.line_number:
+        output(str(index + 1) + delimiter + lines[index])
+    else:
+        output(lines[index])
+
+def count_lines(lines, params):
+    """The function which print count of strings that match the pattern"""
+
+    counter = 0
+
     if params.ignore_case:
         params.pattern = params.pattern.lower()
 
-    for index, line in enumerate(lines):
-        cleaned_line = clean_line(line, params)
+    for index, _ in enumerate(lines):
+        lines[index] = lines[index].rstrip('\n').rstrip()
+        cleaned_line = clean_line(lines[index], params)
 
         if params.invert ^ find_pattern(params.pattern, cleaned_line):
-            add_lines(matches, index, lines, params)
+            counter += 1
+    output(str(counter))
 
-    return matches
+def parse_lines(lines, params):
+    """Creates a list of required strings that match the pattern and parameters
+    max_after and max_before - variables that keeping count the number of lines
+    to print before and after the found one
+    before_matches - the container for the rows that will need to withdraw in
+    the presence of parameter before_context or context"""
 
-def output(line):
-    """Unittest output function"""
+    max_after = params.after_context
+    max_before = params.before_context
+    if params.context:
+        max_after = max_before = params.context
 
-    print(line)
+    before_matches = []
+    after_counter = 0
 
-def output_matches(matches, params):
-    """The correct output information, in accordance with the parameters"""
+    if params.ignore_case:
+        params.pattern = params.pattern.lower()
 
-    if not params.count:
-        for key in matches:
-            if params.context or params.after_context or params.before_context:
-                if params.line_number:
-                    output(str(matches[key][0]) + matches[key][1] + key)
-                else:
-                    output(key)
-            else:
-                if params.line_number:
-                    output(str(matches[key][0]) + matches[key][1] + key)
-                else:
-                    output(key)
-    else:
-        output(str(len(matches)))
+    for index, _ in enumerate(lines):
+        lines[index] = lines[index].rstrip('\n').rstrip()
+        cleaned_line = clean_line(lines[index], params)
+
+        if params.invert ^ find_pattern(params.pattern, cleaned_line):
+            if before_matches:
+                for i in before_matches:
+                    output_line(i, params, lines, "-")
+                before_matches = []
+            if max_after:
+                after_counter = max_after
+            output_line(index, params, lines, ":")
+        elif after_counter:
+            after_counter -= 1
+            output_line(index, params, lines, "-")
+        elif max_before:
+            if len(before_matches) >= max_before:
+                before_matches.pop(0)
+            before_matches.append(index)
 
 def grep(lines, params):
     """UNIX grep realization"""
 
-    matches = parse_lines(lines, params)
-    output_matches(matches, params)
+    if not params.count:
+        parse_lines(lines, params)
+    else:
+        count_lines(lines, params)
 
 def parse_args(args):
     """Сommand line argument parser"""
